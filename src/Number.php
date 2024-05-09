@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace BradieTilley\BCMath;
 
 use Stringable;
@@ -95,7 +97,7 @@ final class Number implements Stringable
         $dividendScale = $this->scale;
 
         $num = bcdiv($this->value, (string) $num, self::TEMPORARY_SCALE);
-        $num = substr($num, -10) === '0000000000' ? rtrim($num, '0') : $num;
+        $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
         $resultScale = self::parseScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
@@ -152,7 +154,7 @@ final class Number implements Stringable
         $baseScale = $this->scale;
 
         $num = bcpow($this->value, $exponent, self::TEMPORARY_SCALE);
-        $num = substr($num, -10) === '0000000000' ? rtrim($num, '0') : $num;
+        $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
         $resultScale = self::parseScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
@@ -172,7 +174,7 @@ final class Number implements Stringable
         $baseScale = $this->scale;
 
         $num = bcsqrt($this->value, self::TEMPORARY_SCALE);
-        $num = substr($num, -10) === '0000000000' ? rtrim($num, '0') : $num;
+        $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
         $resultScale = self::parseScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
@@ -381,8 +383,6 @@ final class Number implements Stringable
         /** Temporary float solution */
         $num = (float) $num;
         $num = (string) round($num, $scale, $roundingMode); /** @phpstan-ignore-line */
-        $num = bcadd($num, '0', $scale);
-
-        return $num;
+        return bcadd($num, '0', $scale);
     }
 }
