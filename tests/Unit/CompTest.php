@@ -6,33 +6,56 @@ test('Number can comp', function () {
     $num = new Number('1.23');
     $num2 = new Number('1.23456');
 
-    expect($num->comp($num2))->toBe(-1);
+    $result = $num->comp($num2);
+    expect($result)->toBe(-1);
     // -1, Same as '1.23' <=> '1.23456'
-    expect($num->comp($num2, 2))->toBe(0);
+
+    $result = $num->comp($num2, 2);
+    expect($result)->toBe(0);
     // 0, Same as '1.23' <=> '1.23'
 
-    expect($num->eq($num2))->toBe(false);
+
+    $result = $num->eq($num2);
+    expect($result)->toBe(false);
     // false, Same as '1.23' == '1.23456'
-    expect($num->eq($num2, 2))->toBe(true);
+
+    $result = $num->eq($num2, 2);
+    expect($result)->toBe(true);
     // true, Same as '1.23' == '1.23'
 
-    expect($num->gt($num2))->toBe(false);
+
+    $result = $num->gt($num2);
+    expect($result)->toBe(false);
     // false, Same as '1.23' > '1.23456'
-    expect($num->gt($num2, 2))->toBe(false);
+
+    $result = $num->gt($num2, 2);
+    expect($result)->toBe(false);
     // false, Same as '1.23' > '1.23'
 
-    expect($num->gte($num2))->toBe(false);
+
+    $result = $num->gte($num2);
+    expect($result)->toBe(false);
     // false, Same as '1.23' >= '1.23456'
-    expect($num->gte($num2, 2))->toBe(true);
+
+    $result = $num->gte($num2, 2);
+    expect($result)->toBe(true);
     // true, Same as '1.23' >= '1.23'
 
-    expect($num->lt($num2))->toBe(true);
+
+    $result = $num->lt($num2);
+    expect($result)->toBe(true);
     // true, Same as '1.23' < '1.23456'
-    expect($num->lt($num2, 2))->toBe(false);
+
+    $result = $num->lt($num2, 2);
+    expect($result)->toBe(false);
     // false, Same as '1.23' < '1.23'
 
-    expect($num->lte($num2))->toBe(true);
+
+    $result = $num->lte($num2);
+    expect($result)->toBe(true);
     // true, Same as '1.23' <= '1.23456'
-    expect($num->lte($num2, 2))->toBe(true);
+
+    $result = $num->lte($num2, 2);
+    expect($result)->toBe(true);
     // true, Same as '1.23' <= '1.23'
 });
