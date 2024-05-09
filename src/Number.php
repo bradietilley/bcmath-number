@@ -140,7 +140,9 @@ final class Number implements Stringable
      */
     public function pow(Number|string|int $exponent, int $minScale, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        if ($exponent->eq(0)) {
+        $exponent = (string) $exponent;
+
+        if ($exponent === '0') {
             return new self(0);
         }
 
@@ -168,7 +170,6 @@ final class Number implements Stringable
     public function sqrt(?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
         $baseScale = $this->scale;
-        $scale = $this->getScale($this->value, $scale);
 
         $num = bcsqrt($this->value, self::TEMPORARY_SCALE);
         $num = substr($num, -10) === '0000000000' ? rtrim($num, '0') : $num;
@@ -294,7 +295,7 @@ final class Number implements Stringable
         $rounded = $this->add(0, $scale, $roundingMode);
 
         return number_format(
-            $rounded->value,
+            (float) $rounded->value,
             $scale,
             $decimalSeparator,
             $thousandsSeparator,
@@ -336,7 +337,13 @@ final class Number implements Stringable
      */
     private static function parseScale(string $value): int
     {
-        return strlen(substr(strrchr($value, '.'), 1));
+        $pos = strrchr($value, '.');
+
+        if ($pos === false) {
+            return 0;
+        }
+
+        return strlen(substr($pos, 1));
     }
 
     /**
@@ -349,8 +356,10 @@ final class Number implements Stringable
      *
      * This does not exist in the RFC and is therefore private.
      */
-    private function getScale(string $num, ?int $scale): int
+    private function getScale(Number|string|int $num, ?int $scale): int
     {
+        $num = (string) $num;
+
         return $scale ??= max($this->scale, self::parseScale($num));
     }
 
@@ -367,12 +376,12 @@ final class Number implements Stringable
     {
         $num = (string) $num;
         $scale = $this->getScale($num, $scale);
-        $num = bcadd($num, 0, self::TEMPORARY_SCALE);
+        $num = bcadd($num, '0', self::TEMPORARY_SCALE);
 
         /** Temporary float solution */
         $num = (float) $num;
-        $num = round($num, $scale, $roundingMode);
-        $num = bcadd($num, 0, $scale);
+        $num = (string) round($num, $scale, $roundingMode); /** @phpstan-ignore-line */
+        $num = bcadd($num, '0', $scale);
 
         return $num;
     }
