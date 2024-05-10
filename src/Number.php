@@ -58,9 +58,7 @@ final class Number implements Stringable
         $scale = max($this->scale, $scale ??= self::determineScale($num));
         $num = bcadd($this->value, (string) $num, self::TEMPORARY_SCALE);
 
-        return new self(
-            $this->roundTo($num, $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -71,9 +69,7 @@ final class Number implements Stringable
         $scale = max($this->scale, $scale ??= self::determineScale($num));
         $num = bcsub($this->value, (string) $num, self::TEMPORARY_SCALE);
 
-        return new self(
-            $this->roundTo($num, $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -81,12 +77,10 @@ final class Number implements Stringable
      */
     public function mul(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = max($this->scale, $scale ??= self::determineScale($num));
+        $scale = $this->scale + $scale ??= self::determineScale($num);
         $num = bcmul($this->value, (string) $num, self::TEMPORARY_SCALE);
 
-        return new self(
-            $this->roundTo($num, $this->scale + $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -94,19 +88,61 @@ final class Number implements Stringable
      */
     public function div(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
+        /**
+         * The dividend (this) scale is used when the scale of the division result
+         * exceeds the MAX_EXPANSION_SCALE.
+         */
         $dividendScale = $this->scale;
 
+        /**
+         * First try the division with a large scale
+         */
         $num = bcdiv($this->value, (string) $num, self::TEMPORARY_SCALE);
-        $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
+
+        /**
+         * If the result has a considerable amount of trailing zeros, consider it
+         * a clean division and round off to the first trailing non-zero.
+         *
+         * E.g. 2482 / 680 = 3.65   using bcdiv (scale 20): 3.65000000000000000000
+         * This value is a clean division and can be trimmed to 3.65
+         *
+         * E.g. 2482 / 681 = 3.6446402349...   using bcdiv (scale 20): 3.64464023494860499265
+         * This value is not a clean division and cannot be trimmed beyond the temporary scale
+         */
+        $num = rtrim($num, '0');
+        $num = $scale !== null ? str_pad($num, $scale, '0', STR_PAD_RIGHT) : $num;
+
+        /**
+         * With the (potentially) rounded off value we can now determine what scale we are
+         * dealing with. Using the examples above:
+         *
+         * E.g. 3.65000000000000000000 -> 3.65 -> 2
+         * E.g. 3.64464023494860499265 -> 3.64464023494860499265 -> 20 (TEMPORARY_SCALE)
+         */
         $resultScale = self::determineScale($num);
 
-        $scale = $resultScale > self::MAX_EXPANSION_SCALE
-            ? ($dividendScale + self::MAX_EXPANSION_SCALE)
-            : max($this->scale, $scale ?? self::determineScale($num));
+        /**
+         * Next we determine the final scale.
+         *
+         * If the user provides one, we'll use that scale. No if buts or maybes.
+         *
+         * If the user doesn't supply one, a suitable scale is derived:
+         *
+         *      If the division resulted in a clean division, such as one with a considerably
+         *      low scale (i.e. the scale is < the MAX_EXPANSION_SCALE), we then use the
+         *      dividend scale or the resulting scale, whichever is greater.
+         *
+         *      If the division resulted in a messy division, such as one with a considerably
+         *      high scale (i.e. the scale is >= the MAX_EXPANSION_SCALE), we then use the
+         *      sum of the dividend scale and the MAX_EXPANSION_SCALE.
+         */
+        if ($scale === null) {
+            $scale = $resultScale >= self::MAX_EXPANSION_SCALE
+                ? ($dividendScale + self::MAX_EXPANSION_SCALE)
+                : max($dividendScale, $resultScale);
+        }
 
-        return new self(
-            $this->roundTo($num, $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -117,9 +153,7 @@ final class Number implements Stringable
         $scale = max($this->scale, $scale ?? self::determineScale($num));
         $num = bcmod($this->value, (string) $num, self::TEMPORARY_SCALE);
 
-        return new self(
-            $this->roundTo($num, $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -161,9 +195,7 @@ final class Number implements Stringable
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
             : $scale ?? max($this->scale, self::determineScale($num));
 
-        return new self(
-            $this->roundTo($num, $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -181,9 +213,7 @@ final class Number implements Stringable
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
             : $scale ?? max($this->scale, self::determineScale($num));
 
-        return new self(
-            $this->roundTo($num, $scale, $roundingMode),
-        );
+        return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
@@ -219,9 +249,7 @@ final class Number implements Stringable
      */
     public function round(int $precision = 0, int $mode = PHP_ROUND_HALF_UP): Number
     {
-        return new self(
-            $this->roundTo($this->value, $precision, $mode),
-        );
+        return $this->rounded($this->value, $precision, $mode);
     }
 
     /**
@@ -356,17 +384,26 @@ final class Number implements Stringable
      * The number is rounded off to the temporary scale (20) and is then
      * rounded off to the appropriate scale and returned in string form.
      *
-     * This does not exist in the RFC and is therefore private.
+     * This does not exist in the RFC and is therefore protected.
      */
-    private function roundTo(Number|string|int $num, ?int $scale, int $roundingMode): string
+    protected static function roundTo(Number|string|int $num, ?int $scale, int $roundingMode): string
     {
         $num = (string) $num;
         $scale ??= self::determineScale($num);
-        $num = bcadd($num, '0', self::TEMPORARY_SCALE);
 
-        /** Temporary float solution */
-        $num = (float) $num;
-        $num = (string) round($num, $scale, $roundingMode); /** @phpstan-ignore-line */
-        return bcadd($num, '0', $scale);
+        $multiplier = bcpow("10", (string) $scale);
+        $multiplied = bcmul($num, $multiplier, self::TEMPORARY_SCALE);
+        $divided = (float) bcdiv($multiplied, "1", self::TEMPORARY_SCALE);
+        $rounded = (string) round($divided, 0, $roundingMode);
+        $final = bcdiv($rounded, $multiplier, $scale);
+
+        return $final;
+    }
+
+    private static function rounded(Number|string|int $num, ?int $scale, int $roundingMode): Number
+    {
+        $rounded = self::roundTo($num, $scale, $roundingMode);
+
+        return new self($rounded);
     }
 }
