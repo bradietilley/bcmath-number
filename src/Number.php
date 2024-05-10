@@ -55,7 +55,7 @@ final class Number implements Stringable
      */
     public function add(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = $this->getScale($num, $scale);
+        $scale = max($this->scale, $scale ??= self::determineScale($num));
         $num = bcadd($this->value, (string) $num, self::TEMPORARY_SCALE);
 
         return new self(
@@ -68,7 +68,7 @@ final class Number implements Stringable
      */
     public function sub(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = $this->getScale($num, $scale);
+        $scale = max($this->scale, $scale ??= self::determineScale($num));
         $num = bcsub($this->value, (string) $num, self::TEMPORARY_SCALE);
 
         return new self(
@@ -81,7 +81,7 @@ final class Number implements Stringable
      */
     public function mul(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = $this->getScale($num, $scale);
+        $scale = max($this->scale, $scale ??= self::determineScale($num));
         $num = bcmul($this->value, (string) $num, self::TEMPORARY_SCALE);
 
         return new self(
@@ -98,11 +98,11 @@ final class Number implements Stringable
 
         $num = bcdiv($this->value, (string) $num, self::TEMPORARY_SCALE);
         $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
-        $resultScale = self::parseScale($num);
+        $resultScale = self::determineScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
             ? ($dividendScale + self::MAX_EXPANSION_SCALE)
-            : $this->getScale($num, $scale);
+            : max($this->scale, $scale ?? self::determineScale($num));
 
         return new self(
             $this->roundTo($num, $scale, $roundingMode),
@@ -114,7 +114,7 @@ final class Number implements Stringable
      */
     public function mod(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = $this->getScale($num, $scale);
+        $scale = max($this->scale, $scale ?? self::determineScale($num));
         $num = bcmod($this->value, (string) $num, self::TEMPORARY_SCALE);
 
         return new self(
@@ -130,7 +130,7 @@ final class Number implements Stringable
     {
         $exponent = (string) $exponent;
         $modulus = (string) $modulus;
-        $scale = $this->getScale($exponent, null);
+        $scale = self::determineScale($exponent);
 
         $result = bcpowmod($this->value, $exponent, $modulus, $scale);
 
@@ -149,17 +149,17 @@ final class Number implements Stringable
         }
 
         $exponent = (string) $exponent;
-        $scale = max($minScale, $this->getScale($this->value, null) * abs((int) $exponent));
+        $scale = max($minScale, self::determineScale($this->value) * abs((int) $exponent));
 
         $baseScale = $this->scale;
 
         $num = bcpow($this->value, $exponent, self::TEMPORARY_SCALE);
         $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
-        $resultScale = self::parseScale($num);
+        $resultScale = self::determineScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
-            : $this->getScale($num, $scale);
+            : $scale ?? max($this->scale, self::determineScale($num));
 
         return new self(
             $this->roundTo($num, $scale, $roundingMode),
@@ -175,11 +175,11 @@ final class Number implements Stringable
 
         $num = bcsqrt($this->value, self::TEMPORARY_SCALE);
         $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
-        $resultScale = self::parseScale($num);
+        $resultScale = self::determineScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
-            : $this->getScale($num, $scale ?? $baseScale);
+            : $scale ?? max($this->scale, self::determineScale($num));
 
         return new self(
             $this->roundTo($num, $scale, $roundingMode),
@@ -230,7 +230,7 @@ final class Number implements Stringable
     public function comp(Number|string|int $num, ?int $scale = null): int
     {
         $num = (string) $num;
-        $scale = $this->getScale($num, $scale);
+        $scale = $scale ?? self::determineScale($num);
 
         return bccomp($this->value, $num, $scale);
     }
@@ -292,8 +292,7 @@ final class Number implements Stringable
      */
     public function format(?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP, string $decimalSeparator = '.', string $thousandsSeparator = ''): string
     {
-        $scale = $this->getScale($this->value, $scale);
-
+        $scale = $scale ??= self::determineScale($this->value);
         $rounded = $this->add(0, $scale, $roundingMode);
 
         return number_format(
@@ -316,6 +315,7 @@ final class Number implements Stringable
      * Internal function to set the value.
      *
      * This does not exist in the RFC and is therefore private.
+     * This is only ever run on construct of a Number instance
      */
     private function setValue(string|int $value): void
     {
@@ -324,7 +324,7 @@ final class Number implements Stringable
         if (is_int($value)) {
             $value = (string) $value;
         } else {
-            $scale = self::parseScale($value);
+            $scale = self::determineScale($value);
         }
 
         $this->value = $value;
@@ -337,8 +337,9 @@ final class Number implements Stringable
      *
      * This does not exist in the RFC and is therefore private.
      */
-    private static function parseScale(string $value): int
+    private static function determineScale(Number|string|int $value): int
     {
+        $value = (string) $value;
         $pos = strrchr($value, '.');
 
         if ($pos === false) {
@@ -346,23 +347,6 @@ final class Number implements Stringable
         }
 
         return strlen(substr($pos, 1));
-    }
-
-    /**
-     * Determine what scale to use:
-     *
-     * User-provided Scale ($scale), or
-     * Greater of:
-     *    the current scale ($this->scale), or
-     *    the inbound number's scale (from $num)
-     *
-     * This does not exist in the RFC and is therefore private.
-     */
-    private function getScale(Number|string|int $num, ?int $scale): int
-    {
-        $num = (string) $num;
-
-        return $scale ??= max($this->scale, self::parseScale($num));
     }
 
     /**
@@ -377,7 +361,7 @@ final class Number implements Stringable
     private function roundTo(Number|string|int $num, ?int $scale, int $roundingMode): string
     {
         $num = (string) $num;
-        $scale = $this->getScale($num, $scale);
+        $scale ??= self::determineScale($num);
         $num = bcadd($num, '0', self::TEMPORARY_SCALE);
 
         /** Temporary float solution */
