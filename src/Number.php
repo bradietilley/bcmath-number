@@ -18,7 +18,7 @@ use Stringable;
 final class Number implements Stringable
 {
     /**
-     * A temporary maximum scale to perform misc operations with
+     * A temporary maximum scale to perform misc operations with.
      */
     private const TEMPORARY_SCALE = 20;
 
@@ -33,6 +33,25 @@ final class Number implements Stringable
      * is specified and cannot be changed from userland.
      */
     private const MAX_EXPANSION_SCALE = 10;
+
+    /**
+     * Constant to represent one in string form
+     */
+    private const ONE = '1';
+
+    /**
+     * Constant to represent zero in string form
+     */
+    private const ZERO = '0';
+
+    /**
+     * The numerical prefix that shows that a number is negative
+     */
+    private const SYMBOL_NEGATIVE = '-';
+
+    private const DECIMAL_SEPARATOR = '.';
+
+    private const THOUSANDS_SEPARATOR = '';
 
     /**
      * The number in string form e.g. "2.0001" or "45"
@@ -55,7 +74,7 @@ final class Number implements Stringable
      */
     public function add(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = max($this->scale, $scale ??= self::determineScale($num));
+        $scale ??= max($this->scale, self::determineScale($num));
         $num = bcadd($this->value, (string) $num, self::TEMPORARY_SCALE);
 
         return $this->rounded($num, $scale, $roundingMode);
@@ -109,8 +128,8 @@ final class Number implements Stringable
          * E.g. 2482 / 681 = 3.6446402349...   using bcdiv (scale 20): 3.64464023494860499265
          * This value is not a clean division and cannot be trimmed beyond the temporary scale
          */
-        $num = rtrim($num, '0');
-        $num = $scale !== null ? str_pad($num, $scale, '0', STR_PAD_RIGHT) : $num;
+        $num = rtrim($num, self::ZERO);
+        $num = $scale !== null ? str_pad($num, $scale, self::ZERO, STR_PAD_RIGHT) : $num;
 
         /**
          * With the (potentially) rounded off value we can now determine what scale we are
@@ -178,7 +197,7 @@ final class Number implements Stringable
     {
         $exponent = (string) $exponent;
 
-        if ($exponent === '0') {
+        if ($exponent === self::ZERO) {
             return new self(0);
         }
 
@@ -188,7 +207,7 @@ final class Number implements Stringable
         $baseScale = $this->scale;
 
         $num = bcpow($this->value, $exponent, self::TEMPORARY_SCALE);
-        $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
+        $num = str_ends_with($num, '0000000000') ? rtrim($num, self::ZERO) : $num;
         $resultScale = self::determineScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
@@ -206,7 +225,7 @@ final class Number implements Stringable
         $baseScale = $this->scale;
 
         $num = bcsqrt($this->value, self::TEMPORARY_SCALE);
-        $num = str_ends_with($num, '0000000000') ? rtrim($num, '0') : $num;
+        $num = str_ends_with($num, '0000000000') ? rtrim($num, self::ZERO) : $num;
         $resultScale = self::determineScale($num);
 
         $scale = $resultScale > self::MAX_EXPANSION_SCALE
@@ -221,7 +240,7 @@ final class Number implements Stringable
      */
     public function floor(): Number
     {
-        if (($pos = strpos($this->value, '.')) === false) {
+        if (($pos = strpos($this->value, self::DECIMAL_SEPARATOR)) === false) {
             return new self($this->value);
         }
 
@@ -235,7 +254,7 @@ final class Number implements Stringable
      */
     public function ceil(): Number
     {
-        if (($pos = strpos($this->value, '.')) === false) {
+        if (($pos = strpos($this->value, self::DECIMAL_SEPARATOR)) === false) {
             return new self($this->value);
         }
 
@@ -318,17 +337,12 @@ final class Number implements Stringable
      *
      * @see number_format()
      */
-    public function format(?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP, string $decimalSeparator = '.', string $thousandsSeparator = ''): string
+    public function format(?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP, string $decimalSeparator = self::DECIMAL_SEPARATOR, string $thousandsSeparator = self::THOUSANDS_SEPARATOR): string
     {
-        $scale = $scale ??= self::determineScale($this->value);
+        $scale ??= self::determineScale($this->value);
         $rounded = $this->add(0, $scale, $roundingMode);
 
-        return number_format(
-            (float) $rounded->value,
-            $scale,
-            $decimalSeparator,
-            $thousandsSeparator,
-        );
+        return self::formatTo($rounded, $decimalSeparator, $thousandsSeparator);
     }
 
     /**
@@ -368,7 +382,7 @@ final class Number implements Stringable
     private static function determineScale(Number|string|int $value): int
     {
         $value = (string) $value;
-        $pos = strrchr($value, '.');
+        $pos = strrchr($value, self::DECIMAL_SEPARATOR);
 
         if ($pos === false) {
             return 0;
@@ -391,13 +405,33 @@ final class Number implements Stringable
         $num = (string) $num;
         $scale ??= self::determineScale($num);
 
-        $multiplier = bcpow("10", (string) $scale);
-        $multiplied = bcmul($num, $multiplier, self::TEMPORARY_SCALE);
-        $divided = (float) bcdiv($multiplied, "1", self::TEMPORARY_SCALE);
-        $rounded = (string) round($divided, 0, $roundingMode);
-        $final = bcdiv($rounded, $multiplier, $scale);
+        $pos = strpos($num, self::DECIMAL_SEPARATOR);
 
-        return $final;
+        if ($pos === false) {
+            return bcdiv($num, self::ONE, $scale);
+        }
+
+        $wholeNumber = substr($num, 0, $pos);
+        $decimalNumber = substr($num, $pos + 1);
+
+        $decimalFixed = substr($decimalNumber, 0, $scale - 1);
+        $decimalRounding = substr($decimalNumber, $scale - 1);
+
+        if ($decimalRounding === '') {
+            return bcdiv($num, self::ONE, $scale);
+        }
+
+        $negative = str_starts_with($wholeNumber, self::SYMBOL_NEGATIVE) ? self::SYMBOL_NEGATIVE : '';
+        $decimalRounding = $negative.substr($decimalRounding, 0, 1).self::DECIMAL_SEPARATOR.substr($decimalRounding, 1);
+        $decimalRounding = (float) $decimalRounding;
+
+        $rounded = (string) round($decimalRounding, 0, $roundingMode);
+        $rounded = ltrim($rounded, self::SYMBOL_NEGATIVE);
+
+        $rounded = $wholeNumber.self::DECIMAL_SEPARATOR.$decimalFixed.$rounded;
+        $rounded = bcdiv($rounded, self::ONE, $scale);
+
+        return $rounded;
     }
 
     private static function rounded(Number|string|int $num, ?int $scale, int $roundingMode): Number
@@ -405,5 +439,43 @@ final class Number implements Stringable
         $rounded = self::roundTo($num, $scale, $roundingMode);
 
         return new self($rounded);
+    }
+
+    protected static function formatTo(Number|string|int $num, string $decimalSeparator = self::DECIMAL_SEPARATOR, string $thousandsSeparator = self::THOUSANDS_SEPARATOR): string
+    {
+        $num = (string) $num;
+        $pos = strpos($num, self::DECIMAL_SEPARATOR);
+        $wholeNumber = $num;
+        $decimalNumber = '';
+
+        if ($pos !== false) {
+            $wholeNumber = substr($num, 0, $pos);
+            $decimalNumber = substr($num, $pos + 1);
+        }
+
+        $wholeNumber = strrev($wholeNumber);
+
+        $pending = '';
+
+        // Add thousands separator
+        for ($i = 0; $i < strlen($wholeNumber); $i++) {
+            $char = $wholeNumber[$i];
+
+            if ($char === self::SYMBOL_NEGATIVE) {
+                $pending .= $char;
+
+                break;
+            }
+
+            if ($i > 0 && $i % 3 === 0) {
+                $pending .= $thousandsSeparator;
+            }
+
+            $pending .= $char;
+        }
+
+        $wholeNumber = strrev($pending);
+
+        return $wholeNumber.$decimalSeparator.$decimalNumber;
     }
 }
