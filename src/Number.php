@@ -71,6 +71,8 @@ final class Number implements Stringable
 
     /**
      * Increase this number by the given number
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function add(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -82,6 +84,8 @@ final class Number implements Stringable
 
     /**
      * Subtract this number by the given number
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function sub(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -93,6 +97,8 @@ final class Number implements Stringable
 
     /**
      * Multiply this number by the given number
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function mul(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -104,6 +110,8 @@ final class Number implements Stringable
 
     /**
      * Divide this number by the given number
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function div(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -166,6 +174,8 @@ final class Number implements Stringable
 
     /**
      * Reduce this number by the given modulus
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function mod(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -192,6 +202,8 @@ final class Number implements Stringable
 
     /**
      * Get the power of this number and given exponent
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function pow(Number|string|int $exponent, int $minScale, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -210,15 +222,17 @@ final class Number implements Stringable
         $num = str_ends_with($num, '0000000000') ? rtrim($num, self::ZERO) : $num;
         $resultScale = self::determineScale($num);
 
-        $scale = $resultScale > self::MAX_EXPANSION_SCALE
+        $scale = ($resultScale > self::MAX_EXPANSION_SCALE)
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
-            : $scale ?? max($this->scale, self::determineScale($num));
+            : $scale;
 
         return $this->rounded($num, $scale, $roundingMode);
     }
 
     /**
      * Get the square root of this number.
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function sqrt(?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
@@ -265,6 +279,8 @@ final class Number implements Stringable
 
     /**
      * Round this number to the given precision
+     *
+     * @param int<1, 4> $mode
      */
     public function round(int $precision = 0, int $mode = PHP_ROUND_HALF_UP): Number
     {
@@ -336,6 +352,8 @@ final class Number implements Stringable
      * Perform a number format
      *
      * @see number_format()
+     *
+     * @param int<1, 4> $roundingMode
      */
     public function format(?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP, string $decimalSeparator = self::DECIMAL_SEPARATOR, string $thousandsSeparator = self::THOUSANDS_SEPARATOR): string
     {
@@ -399,6 +417,8 @@ final class Number implements Stringable
      * rounded off to the appropriate scale and returned in string form.
      *
      * This does not exist in the RFC and is therefore protected.
+     *
+     * @param int<1, 4> $roundingMode
      */
     protected static function roundTo(Number|string|int $num, ?int $scale, int $roundingMode): string
     {
@@ -434,6 +454,11 @@ final class Number implements Stringable
         return $rounded;
     }
 
+    /**
+     * Round the given value to the provide scale or calculated scale.
+     *
+     * @param int<1, 4> $roundingMode
+     */
     private static function rounded(Number|string|int $num, ?int $scale, int $roundingMode): Number
     {
         $rounded = self::roundTo($num, $scale, $roundingMode);
@@ -441,6 +466,9 @@ final class Number implements Stringable
         return new self($rounded);
     }
 
+    /**
+     * Format the given number with the given configuration
+     */
     protected static function formatTo(Number|string|int $num, string $decimalSeparator = self::DECIMAL_SEPARATOR, string $thousandsSeparator = self::THOUSANDS_SEPARATOR): string
     {
         $num = (string) $num;
@@ -454,10 +482,8 @@ final class Number implements Stringable
         }
 
         $wholeNumber = strrev($wholeNumber);
-
         $pending = '';
 
-        // Add thousands separator
         for ($i = 0; $i < strlen($wholeNumber); $i++) {
             $char = $wholeNumber[$i];
 
