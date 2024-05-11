@@ -20,7 +20,7 @@ final class Number implements Stringable
     /**
      * A temporary maximum scale to perform misc operations with.
      */
-    private const TEMPORARY_SCALE = 20;
+    protected const TEMPORARY_SCALE = 20;
 
     /**
      * From RFC:
@@ -32,26 +32,26 @@ final class Number implements Stringable
      * of the left operand. This is the value used only if no scale
      * is specified and cannot be changed from userland.
      */
-    private const MAX_EXPANSION_SCALE = 10;
+    protected const MAX_EXPANSION_SCALE = 10;
 
     /**
      * Constant to represent one in string form
      */
-    private const ONE = '1';
+    protected const ONE = '1';
 
     /**
      * Constant to represent zero in string form
      */
-    private const ZERO = '0';
+    protected const ZERO = '0';
 
     /**
      * The numerical prefix that shows that a number is negative
      */
-    private const SYMBOL_NEGATIVE = '-';
+    protected const SYMBOL_NEGATIVE = '-';
 
-    private const DECIMAL_SEPARATOR = '.';
+    protected const DECIMAL_SEPARATOR = '.';
 
-    private const THOUSANDS_SEPARATOR = '';
+    protected const THOUSANDS_SEPARATOR = '';
 
     /**
      * The number in string form e.g. "2.0001" or "45"
@@ -66,7 +66,8 @@ final class Number implements Stringable
 
     public function __construct(string|int $num)
     {
-        $this->setValue($num);
+        $this->scale = is_int($num) ? 0 : self::determineScale($num);
+        $this->value = (string) $num;
     }
 
     /**
@@ -372,32 +373,12 @@ final class Number implements Stringable
     }
 
     /**
-     * Internal function to set the value.
-     *
-     * This does not exist in the RFC and is therefore private.
-     * This is only ever run on construct of a Number instance
-     */
-    private function setValue(string|int $value): void
-    {
-        $scale = 0;
-
-        if (is_int($value)) {
-            $value = (string) $value;
-        } else {
-            $scale = self::determineScale($value);
-        }
-
-        $this->value = $value;
-        $this->scale = $scale;
-    }
-
-    /**
      * Determine the scale of a number string by counting the number
      * of digits to the right of the period.
      *
-     * This does not exist in the RFC and is therefore private.
+     * This does not exist in the RFC and is therefore protected.
      */
-    private static function determineScale(Number|string|int $value): int
+    protected static function determineScale(Number|string|int $value): int
     {
         $value = (string) $value;
         $pos = strrchr($value, self::DECIMAL_SEPARATOR);
@@ -425,14 +406,7 @@ final class Number implements Stringable
         $num = (string) $num;
         $scale ??= self::determineScale($num);
 
-        $pos = strpos($num, self::DECIMAL_SEPARATOR);
-
-        if ($pos === false) {
-            return bcdiv($num, self::ONE, $scale);
-        }
-
-        $wholeNumber = substr($num, 0, $pos);
-        $decimalNumber = substr($num, $pos + 1);
+        [$wholeNumber, $decimalNumber] = self::parseFragments($num);
 
         $decimalFixed = substr($decimalNumber, 0, $scale - 1);
         $decimalRounding = substr($decimalNumber, $scale - 1);
@@ -459,7 +433,7 @@ final class Number implements Stringable
      *
      * @param int<1, 4> $roundingMode
      */
-    private static function rounded(Number|string|int $num, ?int $scale, int $roundingMode): Number
+    protected static function rounded(Number|string|int $num, ?int $scale, int $roundingMode): Number
     {
         $rounded = self::roundTo($num, $scale, $roundingMode);
 
@@ -472,14 +446,8 @@ final class Number implements Stringable
     protected static function formatTo(Number|string|int $num, string $decimalSeparator = self::DECIMAL_SEPARATOR, string $thousandsSeparator = self::THOUSANDS_SEPARATOR): string
     {
         $num = (string) $num;
-        $pos = strpos($num, self::DECIMAL_SEPARATOR);
-        $wholeNumber = $num;
-        $decimalNumber = '';
 
-        if ($pos !== false) {
-            $wholeNumber = substr($num, 0, $pos);
-            $decimalNumber = substr($num, $pos + 1);
-        }
+        [$wholeNumber, $decimalNumber] = static::parseFragments($num);
 
         $wholeNumber = strrev($wholeNumber);
         $pending = '';
@@ -503,5 +471,28 @@ final class Number implements Stringable
         $wholeNumber = strrev($pending);
 
         return $wholeNumber.$decimalSeparator.$decimalNumber;
+    }
+
+    /**
+     * Parse the given number and extract the whole number and decimal number
+     *
+     * @return array<int, string>
+     */
+    protected static function parseFragments(Number|string|int $num): array
+    {
+        $num = (string) $num;
+        $pos = strpos($num, self::DECIMAL_SEPARATOR);
+        $wholeNumber = $num;
+        $decimalNumber = '';
+
+        if ($pos !== false) {
+            $wholeNumber = substr($num, 0, $pos);
+            $decimalNumber = substr($num, $pos + 1);
+        }
+
+        return [
+            $wholeNumber,
+            $decimalNumber,
+        ];
     }
 }
