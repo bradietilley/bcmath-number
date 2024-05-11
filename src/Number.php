@@ -66,7 +66,7 @@ final class Number implements Stringable
 
     public function __construct(string|int $num)
     {
-        $this->scale = is_int($num) ? 0 : self::determineScale($num);
+        $this->scale = self::determineScale($num);
         $this->value = (string) $num;
     }
 
