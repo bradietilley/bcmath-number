@@ -15,7 +15,7 @@ use Stringable;
  *
  * @see \BCMath\Number (Coming in PHP 8.4)
  */
-final class Number implements Stringable
+final readonly class Number implements Stringable
 {
     /**
      * A temporary maximum scale to perform misc operations with.
