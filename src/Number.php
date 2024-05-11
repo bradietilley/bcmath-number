@@ -523,6 +523,10 @@ final readonly class Number implements Stringable
         $decimalTail = substr($decimalNumber, $minScale);
         $decimalTail = rtrim($decimalTail, self::ZERO);
 
+        if ($minScale === 0 && $decimalTail === '') {
+            return $wholeNumber;
+        }
+
         return $wholeNumber.self::DECIMAL_SEPARATOR.$decimalKeep.$decimalTail;
     }
 }
