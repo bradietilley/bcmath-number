@@ -100,7 +100,7 @@ final readonly class Number implements Stringable
      */
     public function sub(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = max($this->scale, $scale ??= self::determineScale($num));
+        $scale ??= max($this->scale, self::determineScale($num));
         $num = bcsub($this->value, (string) $num, $scale + 1);
 
         return $this->rounded($num, $scale, $roundingMode);
@@ -113,7 +113,7 @@ final readonly class Number implements Stringable
      */
     public function mul(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = $this->scale + $scale ??= self::determineScale($num);
+        $scale ??= $this->scale + self::determineScale($num);
         $num = bcmul($this->value, (string) $num, $scale + self::TEMPORARY_SCALE);
 
         return $this->rounded($num, $scale, $roundingMode);
@@ -191,7 +191,7 @@ final readonly class Number implements Stringable
      */
     public function mod(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
-        $scale = max($this->scale, $scale ?? self::determineScale($num));
+        $scale ??= max($this->scale, self::determineScale($num));
         $num = bcmod($this->value, (string) $num, $scale + self::TEMPORARY_SCALE);
 
         return $this->rounded($num, $scale, $roundingMode);
@@ -226,17 +226,17 @@ final readonly class Number implements Stringable
         }
 
         $exponent = (string) $exponent;
-        $scale = max($minScale, self::determineScale($this->value) * abs((int) $exponent));
+        $tempScale = max($minScale, self::determineScale($this->value) * abs((int) $exponent));
 
         $baseScale = $this->scale;
 
-        $num = bcpow($this->value, $exponent, $scale + self::TEMPORARY_SCALE);
+        $num = bcpow($this->value, $exponent, $tempScale + self::TEMPORARY_SCALE);
         $num = self::removeSuperfluousPrecision($num, $baseScale);
         $resultScale = self::determineScale($num);
 
-        $scale = ($resultScale > self::MAX_EXPANSION_SCALE)
+        $scale ??= ($resultScale > self::MAX_EXPANSION_SCALE)
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
-            : $scale;
+            : $resultScale;
 
         return $this->rounded($num, $scale, $roundingMode);
     }
@@ -254,9 +254,9 @@ final readonly class Number implements Stringable
         $num = self::removeSuperfluousPrecision($num, $baseScale);
         $resultScale = self::determineScale($num);
 
-        $scale = $resultScale > self::MAX_EXPANSION_SCALE
+        $scale ??= $resultScale > self::MAX_EXPANSION_SCALE
             ? ($baseScale + self::MAX_EXPANSION_SCALE)
-            : $scale ?? max($this->scale, self::determineScale($num));
+            : max($this->scale, $resultScale);
 
         return $this->rounded($num, $scale, $roundingMode);
     }
