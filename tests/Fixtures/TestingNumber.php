@@ -11,6 +11,7 @@ use ReflectionMethod;
  * @method static Number rounded(Number|string|int $num, ?int $scale, int $roundingMode)
  * @method static string formatTo(Number|string|int $num, string $decimalSeparator = self::DECIMAL_SEPARATOR, string $thousandsSeparator = self::THOUSANDS_SEPARATOR)
  * @method static array parseFragments(Number|string|int $num)
+ * @method static string removeSuperfluousPrecision(string $num, int $minScale)
  *
  * @mixin Number
  */
