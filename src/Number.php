@@ -505,6 +505,8 @@ final readonly class Number implements Stringable
      * later determine the true precision/scale of the number.
      *
      * E.g.
+     *      "3.00"                  with scale 0             -> "3"
+     *      "3.00"                  with scale 2             -> "3.00"
      *      "3.45"                  with scale 2             -> "3.45"
      *      "3.4500000000000"       with scale 2             -> "3.45"
      *      "3.4500000000000"       with scale 4             -> "3.4500"
