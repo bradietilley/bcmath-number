@@ -59,3 +59,12 @@ test('Number can comp', function () {
     expect($result)->toBe(true);
     // true, Same as '1.23' <= '1.23'
 });
+
+test('Number can comp with high precision on one side', function () {
+    $num = new Number(0);
+    $result = $num->gt('-0.000000000000001');
+    expect($result)->toBe(true);
+    $num = new Number('-0.000000000000001');
+    $result = $num->lt(0);
+    expect($result)->toBe(true);
+});

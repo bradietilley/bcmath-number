@@ -294,7 +294,7 @@ final readonly class Number implements Stringable
     public function comp(Number|string|int $num, ?int $scale = null): int
     {
         $num = (string) $num;
-        $scale = $scale ?? self::determineScale($num);
+        $scale = $scale ?? max($this->scale, self::determineScale($num));
 
         return bccomp($this->value, $num, $scale);
     }
