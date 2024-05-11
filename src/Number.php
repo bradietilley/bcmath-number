@@ -18,7 +18,17 @@ use Stringable;
 final readonly class Number implements Stringable
 {
     /**
-     * A temporary maximum scale to perform misc operations with.
+     * A temporary maximum scale to perform complex operations with.
+     *
+     * The temporary maximum scale should be the maximum known scale
+     * PLUS the value defined here. For example when multiplying two
+     * values with a scale of 4 and a scale of 6, the calculation of
+     * these two values should use a temporary scale of 6 + 20, then
+     * later round off to to the expected or user-supplied precision
+     * using the ROUNDING_MODE provided, which will be less than the
+     * temporary scale used, allowing the rounding to work against a
+     * mostly-unrounded value (technically in this case it would get
+     * rounded at 26 then again at the user-defined scale of say 10)
      */
     protected const TEMPORARY_SCALE = 20;
 
@@ -78,7 +88,7 @@ final readonly class Number implements Stringable
     public function add(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
         $scale ??= max($this->scale, self::determineScale($num));
-        $num = bcadd($this->value, (string) $num, self::TEMPORARY_SCALE);
+        $num = bcadd($this->value, (string) $num, $scale + 1);
 
         return $this->rounded($num, $scale, $roundingMode);
     }
@@ -91,7 +101,7 @@ final readonly class Number implements Stringable
     public function sub(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
         $scale = max($this->scale, $scale ??= self::determineScale($num));
-        $num = bcsub($this->value, (string) $num, self::TEMPORARY_SCALE);
+        $num = bcsub($this->value, (string) $num, $scale + 1);
 
         return $this->rounded($num, $scale, $roundingMode);
     }
@@ -104,7 +114,7 @@ final readonly class Number implements Stringable
     public function mul(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
         $scale = $this->scale + $scale ??= self::determineScale($num);
-        $num = bcmul($this->value, (string) $num, self::TEMPORARY_SCALE);
+        $num = bcmul($this->value, (string) $num, $scale + self::TEMPORARY_SCALE);
 
         return $this->rounded($num, $scale, $roundingMode);
     }
@@ -125,7 +135,8 @@ final readonly class Number implements Stringable
         /**
          * First try the division with a large scale
          */
-        $num = bcdiv($this->value, (string) $num, self::TEMPORARY_SCALE);
+        $temporaryScale = ($scale ?? $dividendScale) + self::TEMPORARY_SCALE;
+        $num = bcdiv($this->value, (string) $num, $temporaryScale);
 
         /**
          * If the result has a considerable amount of trailing zeros, consider it
@@ -144,8 +155,8 @@ final readonly class Number implements Stringable
          * With the (potentially) rounded off value we can now determine what scale we are
          * dealing with. Using the examples above:
          *
-         * E.g. 3.65000000000000000000 -> 3.65 -> 2
-         * E.g. 3.64464023494860499265 -> 3.64464023494860499265 -> 20 (TEMPORARY_SCALE)
+         * E.g. 3.6500000000000000000000 -> 3.65 -> 2
+         * E.g. 3.6446402349486049926543 -> 3.6446402349486049926543 -> 22
          */
         $resultScale = self::determineScale($num);
 
@@ -181,7 +192,7 @@ final readonly class Number implements Stringable
     public function mod(Number|string|int $num, ?int $scale = null, int $roundingMode = PHP_ROUND_HALF_UP): Number
     {
         $scale = max($this->scale, $scale ?? self::determineScale($num));
-        $num = bcmod($this->value, (string) $num, self::TEMPORARY_SCALE);
+        $num = bcmod($this->value, (string) $num, $scale + self::TEMPORARY_SCALE);
 
         return $this->rounded($num, $scale, $roundingMode);
     }
@@ -219,7 +230,7 @@ final readonly class Number implements Stringable
 
         $baseScale = $this->scale;
 
-        $num = bcpow($this->value, $exponent, self::TEMPORARY_SCALE);
+        $num = bcpow($this->value, $exponent, $scale + self::TEMPORARY_SCALE);
         $num = self::removeSuperfluousPrecision($num, $baseScale);
         $resultScale = self::determineScale($num);
 
@@ -239,7 +250,7 @@ final readonly class Number implements Stringable
     {
         $baseScale = $this->scale;
 
-        $num = bcsqrt($this->value, self::TEMPORARY_SCALE);
+        $num = bcsqrt($this->value, $baseScale + self::TEMPORARY_SCALE);
         $num = self::removeSuperfluousPrecision($num, $baseScale);
         $resultScale = self::determineScale($num);
 
