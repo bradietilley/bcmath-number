@@ -550,6 +550,9 @@ final readonly class Number implements Stringable
      */
     protected static function removeSuperfluousLeadingZeros(int|string $num): string
     {
-        return preg_replace('/^(\-?)(?:0+)([0-9](\.\d+)?)$/', '$1$2', (string) $num);
+        $num = preg_replace('/^(\-?)(?:0+)([0-9](\.\d+)?)$/', '$1$2', (string) $num);
+
+        /** @var string $num */
+        return $num;
     }
 }
