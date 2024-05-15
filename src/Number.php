@@ -76,6 +76,8 @@ final readonly class Number implements Stringable
 
     public function __construct(string|int $num)
     {
+        $num = self::removeSuperfluousLeadingZeros($num);
+
         $this->scale = self::determineScale($num);
         $this->value = (string) $num;
     }
@@ -541,5 +543,13 @@ final readonly class Number implements Stringable
         }
 
         return $wholeNumber.self::DECIMAL_SEPARATOR.$decimalKeep.$decimalTail;
+    }
+
+    /**
+     * This cleaning may not be in BCMath\Number however leading zeros *should* be stripped.
+     */
+    protected static function removeSuperfluousLeadingZeros(int|string $num): string
+    {
+        return preg_replace('/^(\-?)(?:0+)([0-9](\.\d+)?)$/', '$1$2', (string) $num);
     }
 }
